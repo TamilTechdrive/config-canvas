@@ -1,0 +1,58 @@
+import { Download, Upload, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { useReactFlow } from '@xyflow/react';
+
+interface EditorToolbarProps {
+  onExport: () => void;
+  onImport: () => void;
+  nodeCount: number;
+  edgeCount: number;
+}
+
+const EditorToolbar = ({ onExport, onImport, nodeCount, edgeCount }: EditorToolbarProps) => {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  return (
+    <div className="h-11 bg-surface-overlay border-b border-border flex items-center px-3 gap-1 justify-between">
+      <div className="flex items-center gap-1">
+        <div className="flex items-center mr-3">
+          <div className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center mr-2">
+            <span className="text-primary text-xs font-bold">C</span>
+          </div>
+          <span className="text-sm font-semibold text-foreground">ConfigFlow</span>
+        </div>
+
+        <Separator orientation="vertical" className="h-5 mx-1" />
+
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => zoomIn()}>
+          <ZoomIn className="w-3.5 h-3.5" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => zoomOut()}>
+          <ZoomOut className="w-3.5 h-3.5" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => fitView({ padding: 0.2 })}>
+          <Maximize2 className="w-3.5 h-3.5" />
+        </Button>
+
+        <Separator orientation="vertical" className="h-5 mx-1" />
+
+        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={onImport}>
+          <Upload className="w-3.5 h-3.5" />
+          Import
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={onExport}>
+          <Download className="w-3.5 h-3.5" />
+          Export
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-mono">
+        <span>{nodeCount} nodes</span>
+        <span>{edgeCount} edges</span>
+      </div>
+    </div>
+  );
+};
+
+export default EditorToolbar;
