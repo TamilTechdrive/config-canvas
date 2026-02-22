@@ -32,6 +32,7 @@ const EditorCanvas = () => {
     onEdgesChange,
     onConnect,
     addNode,
+    autoAddChild,
     updateNodeData,
     deleteNode,
     setSelectedNodeId,
@@ -133,6 +134,9 @@ const EditorCanvas = () => {
               onUpdate={updateNodeData}
               onClose={() => setSelectedNodeId(null)}
               onDelete={deleteNode}
+              onAutoAdd={autoAddChild}
+              edges={edges}
+              allNodes={nodes}
             />
           </div>
         )}
