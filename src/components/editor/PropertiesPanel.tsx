@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Plus, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import type { ConfigNodeData } from '@/types/configTypes';
+import type { ConfigNodeData, ConfigNodeType } from '@/types/configTypes';
 import { NODE_LABELS } from '@/types/configTypes';
+import DependencySuggestions from './DependencySuggestions';
+import type { Edge } from '@xyflow/react';
 
 interface PropertiesPanelProps {
   nodeId: string;
@@ -15,9 +17,12 @@ interface PropertiesPanelProps {
   onUpdate: (nodeId: string, data: Partial<ConfigNodeData>) => void;
   onClose: () => void;
   onDelete: (nodeId: string) => void;
+  onAutoAdd: (parentId: string, type: ConfigNodeType) => void;
+  edges: Edge[];
+  allNodes: { id: string; data: unknown }[];
 }
 
-const PropertiesPanel = ({ nodeId, data, onUpdate, onClose, onDelete }: PropertiesPanelProps) => {
+const PropertiesPanel = ({ nodeId, data, onUpdate, onClose, onDelete, onAutoAdd, edges, allNodes }: PropertiesPanelProps) => {
   const [newPropKey, setNewPropKey] = useState('');
   const [newPropValue, setNewPropValue] = useState('');
 
@@ -155,6 +160,17 @@ const PropertiesPanel = ({ nodeId, data, onUpdate, onClose, onDelete }: Properti
             </Button>
           </div>
         </div>
+
+        <Separator />
+
+        {/* Dependency Suggestions */}
+        <DependencySuggestions
+          nodeId={nodeId}
+          nodeData={data}
+          edges={edges}
+          allNodes={allNodes}
+          onAutoAdd={onAutoAdd}
+        />
 
         <Separator />
 

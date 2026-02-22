@@ -11,6 +11,8 @@ import {
 } from '@xyflow/react';
 import type { ConfigNodeData, ConfigNodeType } from '@/types/configTypes';
 import { NODE_LABELS, NODE_HIERARCHY } from '@/types/configTypes';
+import { validateConnection, getUniquenessViolation } from '@/types/connectionRules';
+import { toast } from 'sonner';
 
 const createNodeData = (type: ConfigNodeType): ConfigNodeData => ({
   label: `New ${NODE_LABELS[type]}`,
@@ -38,16 +40,26 @@ export const useConfigEditor = () => {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      // Validate hierarchy: source must be parent type of target
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
       if (!sourceNode || !targetNode) return;
 
       const sourceType = (sourceNode.data as unknown as ConfigNodeData).type;
       const targetType = (targetNode.data as unknown as ConfigNodeData).type;
-      const expectedParent = NODE_HIERARCHY[targetType];
 
-      if (expectedParent !== sourceType) return;
+      // Validate connection rules
+      const validation = validateConnection(sourceType, targetType);
+      if (!validation.valid) {
+        toast.error('Invalid Connection', { description: validation.message });
+        return;
+      }
+
+      // Uniqueness check
+      const uniqueError = getUniquenessViolation(connection.source!, connection.target!, edges);
+      if (uniqueError) {
+        toast.warning('Connection Blocked', { description: uniqueError });
+        return;
+      }
 
       setEdges((eds) =>
         addEdge(
@@ -60,8 +72,9 @@ export const useConfigEditor = () => {
           eds
         )
       );
+      toast.success('Connected', { description: validation.message });
     },
-    [nodes]
+    [nodes, edges]
   );
 
   const addNode = useCallback((type: ConfigNodeType, position: { x: number; y: number }) => {
@@ -75,6 +88,40 @@ export const useConfigEditor = () => {
     setNodes((nds) => [...nds, newNode]);
     return id;
   }, []);
+
+  const autoAddChild = useCallback((parentId: string, childType: ConfigNodeType) => {
+    const parentNode = nodes.find((n) => n.id === parentId);
+    if (!parentNode) return;
+
+    const offset = { x: 0, y: 150 };
+    const childrenCount = edges.filter((e) => e.source === parentId).length;
+    const position = {
+      x: parentNode.position.x + childrenCount * 220 + offset.x,
+      y: parentNode.position.y + offset.y,
+    };
+
+    const childId = `node_${idCounter.current++}`;
+    const newNode: Node = {
+      id: childId,
+      type: 'configNode',
+      position,
+      data: createNodeData(childType) as unknown as Record<string, unknown>,
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    setEdges((eds) => [
+      ...eds,
+      {
+        id: `edge_${parentId}_${childId}`,
+        source: parentId,
+        target: childId,
+        type: 'smoothstep',
+        animated: true,
+        style: { strokeWidth: 2 },
+      },
+    ]);
+    toast.success(`Added ${NODE_LABELS[childType]}`, { description: `Connected to parent node` });
+  }, [nodes, edges]);
 
   const updateNodeData = useCallback((nodeId: string, updates: Partial<ConfigNodeData>) => {
     setNodes((nds) =>
@@ -143,6 +190,7 @@ export const useConfigEditor = () => {
     onEdgesChange,
     onConnect,
     addNode,
+    autoAddChild,
     updateNodeData,
     deleteNode,
     setSelectedNodeId,
