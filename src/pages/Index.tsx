@@ -1,4 +1,4 @@
-import { useCallback, useRef, useMemo } from 'react';
+import { useCallback, useRef, useMemo, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -15,8 +15,14 @@ import ConfigNode from '@/components/editor/ConfigNode';
 import NodePalette from '@/components/editor/NodePalette';
 import PropertiesPanel from '@/components/editor/PropertiesPanel';
 import EditorToolbar from '@/components/editor/EditorToolbar';
+import NodeInsightPanel from '@/components/editor/NodeInsightPanel';
 import { useConfigEditor } from '@/hooks/useConfigEditor';
 import type { ConfigNodeData, ConfigNodeType } from '@/types/configTypes';
+import { SAMPLE_CONFIG } from '@/data/sampleConfig';
+import { analyzeFullGraph } from '@/engine/ruleEngine';
+import type { RuleIssue } from '@/engine/ruleEngine';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, Sparkles } from 'lucide-react';
 
 const nodeTypes: NodeTypes = {
   configNode: ConfigNode,
@@ -41,7 +47,13 @@ const EditorCanvas = () => {
     loadSampleData,
   } = useConfigEditor();
 
-  const { screenToFlowPosition } = useReactFlow();
+  const [showInsights, setShowInsights] = useState(false);
+  const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
+
+  const graphAnalysis = useMemo(
+    () => analyzeFullGraph(nodes, edges, SAMPLE_CONFIG),
+    [nodes, edges]
+  );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -53,12 +65,7 @@ const EditorCanvas = () => {
       event.preventDefault();
       const type = event.dataTransfer.getData('application/reactflow') as ConfigNodeType;
       if (!type) return;
-
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       addNode(type, position);
     },
     [addNode, screenToFlowPosition]
@@ -67,16 +74,55 @@ const EditorCanvas = () => {
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: { id: string }) => {
       setSelectedNodeId(node.id);
+      setShowInsights(true);
     },
     [setSelectedNodeId]
   );
 
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
+    setShowInsights(false);
   }, [setSelectedNodeId]);
+
+  const onFocusNode = useCallback(
+    (nodeId: string) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      if (node) {
+        setCenter(node.position.x + 100, node.position.y + 50, { zoom: 1.5, duration: 500 });
+        setSelectedNodeId(nodeId);
+      }
+    },
+    [nodes, setCenter, setSelectedNodeId]
+  );
+
+  const onFixIssue = useCallback(
+    (issue: RuleIssue) => {
+      if (!issue.fix) return;
+      if (issue.fix.action === 'add_option') {
+        updateNodeData(issue.fix.payload.nodeId, { included: true } as any);
+      } else if (issue.fix.action === 'remove_option') {
+        updateNodeData(issue.fix.payload.nodeId, { included: false } as any);
+      }
+    },
+    [updateNodeData]
+  );
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background">
+      {/* Status bar */}
+      <div className="h-8 border-b border-border bg-surface-overlay flex items-center px-4 gap-4 text-xs">
+        <span className="text-muted-foreground font-medium">ConfigFlow AI</span>
+        <div className="flex items-center gap-1.5">
+          <AlertCircle className="w-3 h-3 text-destructive" />
+          <span className="text-muted-foreground">{graphAnalysis.totalIssues} issues</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Sparkles className="w-3 h-3 text-accent" />
+          <span className="text-muted-foreground">{graphAnalysis.totalConflicts} conflicts</span>
+        </div>
+        <span className="text-muted-foreground ml-auto">{nodes.length} nodes · {edges.length} edges</span>
+      </div>
+
       <div className="flex-1 relative">
         <ReactFlow
           nodes={nodes}
@@ -92,10 +138,7 @@ const EditorCanvas = () => {
           fitView
           snapToGrid
           snapGrid={[16, 16]}
-          defaultEdgeOptions={{
-            type: 'smoothstep',
-            animated: true,
-          }}
+          defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
           proOptions={{ hideAttribution: true }}
         >
           <EditorToolbar
@@ -127,9 +170,24 @@ const EditorCanvas = () => {
           <NodePalette />
         </div>
 
-        {/* Right properties panel */}
-        {selectedNode && (
-          <div className="absolute right-0 top-11 bottom-0 z-10">
+        {/* Right panel: Insights or Properties */}
+        {selectedNode && showInsights && (
+          <div className="absolute right-0 top-0 bottom-0 z-10 flex">
+            {/* Insight Panel */}
+            <NodeInsightPanel
+              nodeId={selectedNodeId!}
+              nodes={nodes}
+              edges={edges}
+              rawConfig={SAMPLE_CONFIG}
+              onClose={() => setShowInsights(false)}
+              onFocusNode={onFocusNode}
+              onFixIssue={onFixIssue}
+            />
+          </div>
+        )}
+
+        {selectedNode && !showInsights && (
+          <div className="absolute right-0 top-0 bottom-0 z-10">
             <PropertiesPanel
               nodeId={selectedNodeId!}
               data={selectedNode.data as unknown as ConfigNodeData}

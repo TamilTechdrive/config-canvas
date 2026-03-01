@@ -143,7 +143,7 @@ export const parseConfigToFlow = (config: RawConfig): ParseResult => {
     // Create rule dependency edges (dashed, different color)
     mod.rules.forEach((rule) => {
       const dependentId = optionKeyToNodeId[rule.option_key];
-      rule.requires.forEach((reqKey) => {
+      (rule.requires ?? []).forEach((reqKey) => {
         const requiredId = optionKeyToNodeId[reqKey];
         if (dependentId && requiredId) {
           edges.push({
@@ -155,6 +155,22 @@ export const parseConfigToFlow = (config: RawConfig): ParseResult => {
             style: { strokeWidth: 2, strokeDasharray: '6 3', stroke: 'hsl(35 80% 55%)' },
             label: 'requires',
             labelStyle: { fill: 'hsl(35 80% 55%)', fontSize: 10, fontWeight: 600 },
+          });
+        }
+      });
+      // Conflict edges (red dashed)
+      (rule.conflicts ?? []).forEach((conflictKey) => {
+        const conflictId = optionKeyToNodeId[conflictKey];
+        if (dependentId && conflictId) {
+          edges.push({
+            id: `conflict_${dependentId}_${conflictId}`,
+            source: dependentId,
+            target: conflictId,
+            type: 'smoothstep',
+            animated: false,
+            style: { strokeWidth: 2, strokeDasharray: '4 4', stroke: 'hsl(0 70% 50%)' },
+            label: 'conflicts',
+            labelStyle: { fill: 'hsl(0 70% 50%)', fontSize: 10, fontWeight: 600 },
           });
         }
       });

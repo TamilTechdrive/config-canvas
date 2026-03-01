@@ -1,8 +1,10 @@
-import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Box, Puzzle, Layers, ToggleLeft, GripVertical } from 'lucide-react';
+import { memo, useMemo } from 'react';
+import { Handle, Position, type NodeProps, useEdges, useNodes } from '@xyflow/react';
+import { Box, Puzzle, Layers, ToggleLeft, GripVertical, AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { ConfigNodeData, ConfigNodeType } from '@/types/configTypes';
 import { NODE_CHILDREN } from '@/types/configTypes';
+import { analyzeNode } from '@/engine/ruleEngine';
+import { SAMPLE_CONFIG } from '@/data/sampleConfig';
 
 const iconMap: Record<ConfigNodeType, React.ElementType> = {
   container: Box,
@@ -25,11 +27,22 @@ const iconColorMap: Record<ConfigNodeType, string> = {
   option: 'text-node-option',
 };
 
-const ConfigNode = ({ data, selected }: NodeProps) => {
+const ConfigNode = ({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as ConfigNodeData;
   const Icon = iconMap[nodeData.type];
-  const canHaveChildren = NODE_CHILDREN[nodeData.type] !== null;
+  const canHaveChildren = true; // All nodes need source handle for rule/conflict edges
   const hasParent = nodeData.type !== 'container';
+
+  const nodes = useNodes();
+  const edges = useEdges();
+
+  const analysis = useMemo(
+    () => analyzeNode(id, nodes, edges, SAMPLE_CONFIG),
+    [id, nodes, edges]
+  );
+
+  const errorCount = analysis.issues.filter((i) => i.severity === 'error').length;
+  const warningCount = analysis.issues.filter((i) => i.severity === 'warning').length;
 
   return (
     <div
@@ -46,6 +59,31 @@ const ConfigNode = ({ data, selected }: NodeProps) => {
           position={Position.Top}
           className="!w-3 !h-3 !bg-muted-foreground/50 !border-2 !border-card hover:!bg-primary transition-colors"
         />
+      )}
+
+      {/* Health badge */}
+      {(errorCount > 0 || warningCount > 0) && (
+        <div className="absolute -top-2 -right-2 z-10 flex gap-0.5">
+          {errorCount > 0 && (
+            <span className="flex items-center gap-0.5 bg-destructive text-destructive-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+              <AlertCircle className="w-2.5 h-2.5" />
+              {errorCount}
+            </span>
+          )}
+          {warningCount > 0 && (
+            <span className="flex items-center gap-0.5 bg-node-group text-background text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              {warningCount}
+            </span>
+          )}
+        </div>
+      )}
+      {errorCount === 0 && warningCount === 0 && nodeData.type === 'option' && (
+        <div className="absolute -top-2 -right-2 z-10">
+          <span className="flex items-center bg-node-module text-background text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+            <CheckCircle2 className="w-2.5 h-2.5" />
+          </span>
+        </div>
       )}
 
       <div className="px-3 py-2 flex items-center gap-2 border-b border-border/50">
