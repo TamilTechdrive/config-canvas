@@ -12,6 +12,8 @@ import {
 import type { ConfigNodeData, ConfigNodeType } from '@/types/configTypes';
 import { NODE_LABELS, NODE_HIERARCHY } from '@/types/configTypes';
 import { validateConnection, getUniquenessViolation } from '@/types/connectionRules';
+import { SAMPLE_CONFIG } from '@/data/sampleConfig';
+import { parseConfigToFlow } from '@/data/configParser';
 import { toast } from 'sonner';
 
 const createNodeData = (type: ConfigNodeType): ConfigNodeData => ({
@@ -22,11 +24,14 @@ const createNodeData = (type: ConfigNodeType): ConfigNodeData => ({
   visible: true,
 });
 
+// Parse sample data for initial load
+const initialData = parseConfigToFlow(SAMPLE_CONFIG);
+
 export const useConfigEditor = () => {
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [nodes, setNodes] = useState<Node[]>(initialData.nodes);
+  const [edges, setEdges] = useState<Edge[]>(initialData.edges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const idCounter = useRef(1);
+  const idCounter = useRef(initialData.maxId);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -161,24 +166,46 @@ export const useConfigEditor = () => {
       reader.onload = (ev) => {
         try {
           const config = JSON.parse(ev.target?.result as string);
+
+          // Try parsing as raw module config first
+          if (config.modules && Array.isArray(config.modules)) {
+            const parsed = parseConfigToFlow(config);
+            setNodes(parsed.nodes);
+            setEdges(parsed.edges);
+            idCounter.current = parsed.maxId;
+            setSelectedNodeId(null);
+            toast.success('Imported', { description: `Loaded ${parsed.nodes.length} nodes from module config` });
+            return;
+          }
+
+          // Fall back to React Flow format
           if (config.nodes && config.edges) {
             setNodes(config.nodes);
             setEdges(config.edges);
-            // Update counter
             const maxId = config.nodes.reduce((max: number, n: Node) => {
               const num = parseInt(n.id.replace('node_', ''), 10);
               return isNaN(num) ? max : Math.max(max, num);
             }, 0);
             idCounter.current = maxId + 1;
             setSelectedNodeId(null);
+            toast.success('Imported', { description: `Loaded ${config.nodes.length} nodes` });
           }
         } catch {
-          console.error('Invalid config file');
+          toast.error('Import Failed', { description: 'Invalid JSON file' });
         }
       };
       reader.readAsText(file);
     };
     input.click();
+  }, []);
+
+  const loadSampleData = useCallback(() => {
+    const parsed = parseConfigToFlow(SAMPLE_CONFIG);
+    setNodes(parsed.nodes);
+    setEdges(parsed.edges);
+    idCounter.current = parsed.maxId;
+    setSelectedNodeId(null);
+    toast.success('Sample Loaded', { description: `${parsed.nodes.length} nodes, ${parsed.edges.length} edges` });
   }, []);
 
   return {
@@ -196,5 +223,6 @@ export const useConfigEditor = () => {
     setSelectedNodeId,
     exportConfig,
     importConfig,
+    loadSampleData,
   };
 };

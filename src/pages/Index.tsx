@@ -38,6 +38,7 @@ const EditorCanvas = () => {
     setSelectedNodeId,
     exportConfig,
     importConfig,
+    loadSampleData,
   } = useConfigEditor();
 
   const { screenToFlowPosition } = useReactFlow();
@@ -100,6 +101,7 @@ const EditorCanvas = () => {
           <EditorToolbar
             onExport={exportConfig}
             onImport={importConfig}
+            onLoadSample={loadSampleData}
             nodeCount={nodes.length}
             edgeCount={edges.length}
           />
